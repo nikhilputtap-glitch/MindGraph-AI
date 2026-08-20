@@ -2,6 +2,7 @@ import os
 import sqlite3
 import json
 import io
+from datetime import datetime
 import streamlit as st
 from google import genai
 from sentence_transformers import SentenceTransformer
@@ -42,7 +43,8 @@ def init_db():
             decision TEXT,
             rationale TEXT,
             risks TEXT,
-            vector BLOB
+            vector BLOB,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     conn.commit()
@@ -51,7 +53,7 @@ def init_db():
 init_db()
 
 # PDF Generation Function
-def generate_pdf_report(records):
+def generate_pdf_report(records, report_title="MindGraph AI - Decision Architecture Audit Log"):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -67,8 +69,8 @@ def generate_pdf_report(records):
         'DocTitle',
         parent=styles['Heading1'],
         fontName='Helvetica-Bold',
-        fontSize=22,
-        leading=26,
+        fontSize=20,
+        leading=24,
         textColor=colors.HexColor('#1E293B')
     )
     subtitle_style = ParagraphStyle(
@@ -83,8 +85,8 @@ def generate_pdf_report(records):
         'Heading2',
         parent=styles['Heading2'],
         fontName='Helvetica-Bold',
-        fontSize=13,
-        leading=16,
+        fontSize=12,
+        leading=15,
         textColor=colors.HexColor('#0F172A')
     )
     body_style = ParagraphStyle(
@@ -106,16 +108,16 @@ def generate_pdf_report(records):
     
     story = []
     
-    # Title Header
-    story.append(Paragraph("🧠 MindGraph AI - Decision Architecture Audit Log", title_style))
+    story.append(Paragraph(f"🧠 {report_title}", title_style))
     story.append(Spacer(1, 4))
-    story.append(Paragraph("Enterprise Tacit Knowledge Base Report & Historical Records", subtitle_style))
+    story.append(Paragraph("Enterprise Tacit Knowledge Base Report & Audit Records", subtitle_style))
     story.append(Spacer(1, 10))
     story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#2563EB'), spaceAfter=15))
     
     for rec in records:
-        r_id, trans, dec, rat, rsk = rec
-        story.append(Paragraph(f"Record #{r_id}: {dec[:70]}...", heading2_style))
+        r_id, trans, dec, rat, rsk, created_at = rec
+        date_str = created_at if created_at else "N/A"
+        story.append(Paragraph(f"Record #{r_id} | Date: {date_str}", heading2_style))
         story.append(Spacer(1, 6))
         
         table_data = [
@@ -176,7 +178,7 @@ def save_decision(transcript, decision, rationale, risks):
 def get_all_records():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("SELECT id, transcript, decision, rationale, risks FROM decisions ORDER BY id DESC")
+    cursor.execute("SELECT id, transcript, decision, rationale, risks, created_at FROM decisions ORDER BY id DESC")
     records = cursor.fetchall()
     conn.close()
     return records
@@ -204,16 +206,6 @@ with tab1:
                     )
                     st.success("Decision extracted and vector indexed successfully!")
                     st.json(data)
-                    
-                    # Single PDF Export Button
-                    single_rec = [(1, transcript_input, data.get("decision", ""), data.get("rationale", ""), data.get("risks", ""))]
-                    pdf_bytes = generate_pdf_report(single_rec)
-                    st.download_button(
-                        label="📄 Download Decision Summary (PDF)",
-                        data=pdf_bytes,
-                        file_name="MindGraph_Decision_Summary.pdf",
-                        mime="application/pdf"
-                    )
                 except Exception as e:
                     st.error(f"Extraction Error: {e}")
         else:
@@ -252,24 +244,102 @@ with tab2:
             st.info("No indexed decisions found in database.")
 
 with tab3:
-    st.subheader("Indexed Organizational Memory")
+    st.subheader("Indexed Organizational Memory & Custom Audit Reports")
     records = get_all_records()
     
     if records:
-        pdf_data = generate_pdf_report(records)
-        st.download_button(
-            label="📥 Download Complete Audit Report (PDF)",
-            data=pdf_data,
-            file_name="MindGraph_Full_Audit_Report.pdf",
-            mime="application/pdf",
-            type="primary"
-        )
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            filter_mode = st.radio("Filter By:", ["All Time", "By Month", "By Year", "By Specific Date"])
+        
+        display_records = []
+        report_title = "MindGraph AI - Decision Audit Report"
+        file_suffix = "Full_Report"
+        
+        with col2:
+            if filter_mode == "All Time":
+                display_records = records
+                report_title = "MindGraph AI - All Time Decision Audit Report"
+                file_suffix = "All_Time"
+                
+            elif filter_mode == "By Month":
+                months_dict = {}
+                for r in records:
+                    created_at = r[5]
+                    if created_at:
+                        try:
+                            dt = datetime.strptime(created_at.split()[0], "%Y-%m-%d")
+                            m_key = dt.strftime("%B %Y")
+                        except Exception:
+                            m_key = "Other"
+                        months_dict.setdefault(m_key, []).append(r)
+                
+                sel_m = st.selectbox("Select Month:", options=list(months_dict.keys()))
+                display_records = months_dict.get(sel_m, [])
+                report_title = f"MindGraph AI - {sel_m} Monthly Audit Report"
+                file_suffix = sel_m.replace(" ", "_") if sel_m else "Month"
+                
+            elif filter_mode == "By Year":
+                years_dict = {}
+                for r in records:
+                    created_at = r[5]
+                    if created_at:
+                        try:
+                            dt = datetime.strptime(created_at.split()[0], "%Y-%m-%d")
+                            y_key = dt.strftime("%Y")
+                        except Exception:
+                            y_key = "Other"
+                        years_dict.setdefault(y_key, []).append(r)
+                
+                sel_y = st.selectbox("Select Year:", options=list(years_dict.keys()))
+                display_records = years_dict.get(sel_y, [])
+                report_title = f"MindGraph AI - {sel_y} Annual Audit Report"
+                file_suffix = f"Year_{sel_y}" if sel_y else "Year"
+                
+            elif filter_mode == "By Specific Date":
+                sel_date = st.date_input("Select Date:", value=datetime.now())
+                target_date_str = sel_date.strftime("%Y-%m-%d")
+                
+                for r in records:
+                    created_at = r[5]
+                    if created_at and created_at.startswith(target_date_str):
+                        display_records.append(r)
+                        
+                report_title = f"MindGraph AI - {target_date_str} Daily Audit Report"
+                file_suffix = f"Date_{target_date_str}"
+
         st.divider()
-        for r_id, trans, dec, rat, rsk in records:
-            with st.expander(f"Record #{r_id}: {dec[:80]}"):
-                st.write(f"**Decision:** {dec}")
-                st.write(f"**Rationale:** {rat}")
-                st.write(f"**Risks:** {rsk}")
-                st.text_area("Original Log", trans, height=100, disabled=True, key=f"raw_{r_id}")
+        
+        if display_records:
+            pdf_data = generate_pdf_report(display_records, report_title=report_title)
+            st.download_button(
+                label=f"📥 Download {report_title} (PDF)",
+                data=pdf_data,
+                file_name=f"MindGraph_Audit_{file_suffix}.pdf",
+                mime="application/pdf",
+                type="primary"
+            )
+            st.write(f"Showing **{len(display_records)}** record(s) for selected filter.")
+            st.divider()
+            
+            for r_id, trans, dec, rat, rsk, created_at in display_records:
+                date_str = f" | Date: {created_at}" if created_at else ""
+                with st.expander(f"Record #{r_id}{date_str}: {dec[:80]}"):
+                    st.write(f"**Decision:** {dec}")
+                    st.write(f"**Rationale:** {rat}")
+                    st.write(f"**Risks:** {rsk}")
+                    st.text_area("Original Log", trans, height=100, disabled=True, key=f"raw_{r_id}")
+                    
+                    ind_pdf = generate_pdf_report([(r_id, trans, dec, rat, rsk, created_at)], report_title=f"Decision #{r_id} Summary")
+                    st.download_button(
+                        label=f"📄 Download Decision #{r_id} (PDF)",
+                        data=ind_pdf,
+                        file_name=f"MindGraph_Decision_{r_id}.pdf",
+                        mime="application/pdf",
+                        key=f"pdf_btn_{r_id}"
+                    )
+        else:
+            st.warning("No decisions found for the selected date/filter criteria.")
     else:
         st.info("Knowledge base is currently empty.")
