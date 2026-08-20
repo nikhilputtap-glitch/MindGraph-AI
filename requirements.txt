@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+sqlalchemy
+google-genai
+sentence-transformers
+scikit-learn
+streamlit
+reportlab
+requests
+numpy
