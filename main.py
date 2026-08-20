@@ -104,9 +104,9 @@ def generate_pdf_report(records, report_title="MindGraph AI - Decision Architect
         story.append(Spacer(1, 6))
         
         table_data = [
-            [Paragraph("Decision:", bold_label), Paragraph(dec, body_style)],
-            [Paragraph("Rationale:", bold_label), Paragraph(rat, body_style)],
-            [Paragraph("Identified Risks:", bold_label), Paragraph(rsk, body_style)],
+            [Paragraph("Decision:", bold_label), Paragraph(str(dec), body_style)],
+            [Paragraph("Rationale:", bold_label), Paragraph(str(rat), body_style)],
+            [Paragraph("Identified Risks:", bold_label), Paragraph(str(rsk), body_style)],
         ]
         
         t = Table(table_data, colWidths=[100, 440])
@@ -147,12 +147,20 @@ def extract_decision_logic(transcript: str):
     return json.loads(text)
 
 def save_decision(transcript, decision, rationale, risks):
-    vec_bytes = embedder.encode(decision).tobytes()
+    # Convert list/dict parameters to clean string to avoid psycopg2 type binding errors
+    if isinstance(risks, (list, dict)):
+        risks = ", ".join(risks) if isinstance(risks, list) else str(risks)
+    if isinstance(decision, (list, dict)):
+        decision = ", ".join(decision) if isinstance(decision, list) else str(decision)
+    if isinstance(rationale, (list, dict)):
+        rationale = ", ".join(rationale) if isinstance(rationale, list) else str(rationale)
+
+    vec_bytes = embedder.encode(str(decision)).tobytes()
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
         "INSERT INTO decisions (transcript, decision, rationale, risks, vector) VALUES (%s, %s, %s, %s, %s)",
-        (transcript, decision, rationale, risks, psycopg2.Binary(vec_bytes))
+        (str(transcript), str(decision), str(rationale), str(risks), psycopg2.Binary(vec_bytes))
     )
     conn.commit()
     cursor.close()
@@ -220,7 +228,7 @@ with tab2:
             results.sort(key=lambda x: x[0], reverse=True)
             
             for sim, dec, rat, rsk in results[:5]:
-                with st.expander(f"🎯 Match Confidence: {sim*100:.1f}% - {dec[:60]}..."):
+                with st.expander(f"🎯 Match Confidence: {sim*100:.1f}% - {str(dec)[:60]}..."):
                     st.write(f"**Decision:** {dec}")
                     st.write(f"**Rationale:** {rat}")
                     st.write(f"**Identified Risks:** {rsk}")
@@ -301,7 +309,7 @@ with tab3:
             
             for r_id, trans, dec, rat, rsk, created_at in display_records:
                 date_str = f" | Date: {created_at}" if created_at else ""
-                with st.expander(f"Record #{r_id}{date_str}: {dec[:80]}"):
+                with st.expander(f"Record #{r_id}{date_str}: {str(dec)[:80]}"):
                     st.write(f"**Decision:** {dec}")
                     st.write(f"**Rationale:** {rat}")
                     st.write(f"**Risks:** {rsk}")
