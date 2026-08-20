@@ -1,164 +1,321 @@
 import os
 import json
+import io
 from datetime import datetime
-from fastapi import FastAPI, HTTPException, Depends
-from pydantic import BaseModel
+import psycopg2
+import streamlit as st
 from google import genai
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime
-from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from sentence_transformers import SentenceTransformer
-import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
 
-# 1. Database Setup (SQLite)
-DATABASE_URL = "sqlite:///./mindgraph.db"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+# Page Configuration
+st.set_page_config(page_title="MindGraph AI", page_icon="🧠", layout="wide")
 
-class KnowledgeRecord(Base):
-    __tablename__ = "knowledge_records"
+# API Keys & DB Setup
+api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
+db_url = st.secrets.get("DATABASE_URL") or os.getenv("DATABASE_URL")
 
-    id = Column(Integer, primary_key=True, index=True)
-    channel_name = Column(String, index=True)
-    transcript = Column(Text)
-    extracted_json = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
+if not api_key:
+    st.error("GEMINI_API_KEY Missing! Add it to Streamlit Secrets.")
+    st.stop()
 
-Base.metadata.create_all(bind=engine)
+if not db_url:
+    st.error("DATABASE_URL Missing! Add Supabase URI to Streamlit Secrets.")
+    st.stop()
 
-# 2. Semantic Search Embedding Model Initialization
-embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-
-# 3. FastAPI Setup
-app = FastAPI(title="MindGraph AI - Tacit Knowledge Extractor")
-
-import os
-
-api_key = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key=api_key)
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# Load Embedding Model
+@st.cache_resource
+def load_embedder():
+    return SentenceTransformer('all-MiniLM-L6-v2')
 
-class ConversationInput(BaseModel):
-    channel_name: str
-    chat_transcript: str
+embedder = load_embedder()
 
-class DecisionResponse(BaseModel):
-    status: str
-    record_id: int
-    extracted_data: dict
+# Database Helper Functions
+def get_db_connection():
+    return psycopg2.connect(db_url)
 
-class SearchQuery(BaseModel):
-    query: str
+def init_db():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS decisions (
+            id SERIAL PRIMARY KEY,
+            transcript TEXT,
+            decision TEXT,
+            rationale TEXT,
+            risks TEXT,
+            vector BYTEA,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    cursor.close()
+    conn.close()
 
-@app.get("/")
-def home():
-    return {"message": "MindGraph AI Core Engine is Running!"}
+init_db()
 
-@app.post("/extract-decision", response_model=DecisionResponse)
-def extract_decision(data: ConversationInput, db: Session = Depends(get_db)):
-    prompt = f"""
-    You are an Enterprise Institutional Knowledge Extractor.
-    Analyze the following team discussion transcript from channel #{data.channel_name}.
+# PDF Generation Function
+def generate_pdf_report(records, report_title="MindGraph AI - Decision Architecture Audit Log"):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=36,
+        leftMargin=36,
+        topMargin=36,
+        bottomMargin=36
+    )
     
-    Extract:
-    1. Key Decisions Made
-    2. Rationale/Reasoning behind each decision (The "WHY")
-    3. Technical or Business Risks identified
-
-    Chat Transcript:
-    {data.chat_transcript}
-
-    Return response in clear raw JSON format with keys: 'decisions', 'rationale', 'risks'.
-    """
-
-    try:
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt,
-        )
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'DocTitle', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=20, leading=24, textColor=colors.HexColor('#1E293B')
+    )
+    subtitle_style = ParagraphStyle(
+        'DocSubTitle', parent=styles['Normal'], fontName='Helvetica', fontSize=10, leading=14, textColor=colors.HexColor('#64748B')
+    )
+    heading2_style = ParagraphStyle(
+        'Heading2', parent=styles['Heading2'], fontName='Helvetica-Bold', fontSize=12, leading=15, textColor=colors.HexColor('#0F172A')
+    )
+    body_style = ParagraphStyle(
+        'Body', parent=styles['Normal'], fontName='Helvetica', fontSize=10, leading=14, textColor=colors.HexColor('#334155')
+    )
+    bold_label = ParagraphStyle(
+        'BoldLabel', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, leading=14, textColor=colors.HexColor('#1E293B')
+    )
+    
+    story = []
+    story.append(Paragraph(f"🧠 {report_title}", title_style))
+    story.append(Spacer(1, 4))
+    story.append(Paragraph("Enterprise Tacit Knowledge Base Report & Audit Records", subtitle_style))
+    story.append(Spacer(1, 10))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#2563EB'), spaceAfter=15))
+    
+    for rec in records:
+        r_id, trans, dec, rat, rsk, created_at = rec
+        date_str = str(created_at) if created_at else "N/A"
+        story.append(Paragraph(f"Record #{r_id} | Date: {date_str}", heading2_style))
+        story.append(Spacer(1, 6))
         
-        raw_text = response.text.replace("```json", "").replace("```", "").strip()
-        parsed_json = json.loads(raw_text)
+        table_data = [
+            [Paragraph("Decision:", bold_label), Paragraph(dec, body_style)],
+            [Paragraph("Rationale:", bold_label), Paragraph(rat, body_style)],
+            [Paragraph("Identified Risks:", bold_label), Paragraph(rsk, body_style)],
+        ]
+        
+        t = Table(table_data, colWidths=[100, 440])
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#334155')),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        
+        story.append(t)
+        story.append(Spacer(1, 12))
+    
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
 
-        # Save to Database
-        db_record = KnowledgeRecord(
-            channel_name=data.channel_name,
-            transcript=data.chat_transcript,
-            extracted_json=json.dumps(parsed_json)
-        )
-        db.add(db_record)
-        db.commit()
-        db.refresh(db_record)
+# Core Logic: Gemini Extraction
+def extract_decision_logic(transcript: str):
+    prompt = f"""
+    Analyze the following developer chat transcript and extract key architecture/design decisions.
+    Return ONLY a valid JSON object with keys: "decision", "rationale", "risks".
+    
+    Transcript:
+    {transcript}
+    """
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt
+    )
+    
+    text = response.text.strip()
+    if text.startswith("```json"):
+        text = text[7:-3].strip()
+    return json.loads(text)
 
-        return {"status": "success", "record_id": db_record.id, "extracted_data": parsed_json}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+def save_decision(transcript, decision, rationale, risks):
+    vec_bytes = embedder.encode(decision).tobytes()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO decisions (transcript, decision, rationale, risks, vector) VALUES (%s, %s, %s, %s, %s)",
+        (transcript, decision, rationale, risks, psycopg2.Binary(vec_bytes))
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
 
-@app.get("/records")
-def fetch_all_records(db: Session = Depends(get_db)):
-    records = db.query(KnowledgeRecord).all()
+def get_all_records():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, transcript, decision, rationale, risks, created_at FROM decisions ORDER BY id DESC")
+    records = cursor.fetchall()
+    cursor.close()
+    conn.close()
     return records
 
-@app.post("/search-knowledge")
-def search_knowledge(search_data: SearchQuery, db: Session = Depends(get_db)):
-    records = db.query(KnowledgeRecord).all()
-    if not records:
-        return {"query": search_data.query, "results": [], "summary": "No records found in database."}
+# UI Header
+st.title("🧠 MindGraph AI")
+st.caption("Enterprise Tacit Knowledge Extractor & RAG Engine (Cloud Postgres Powered)")
 
-    # Generate query vector
-    query_vec = embedding_model.encode([search_data.query])
+tab1, tab2, tab3 = st.tabs(["📝 Extract Decision", "🔍 Vector RAG Search", "📊 Knowledge Base & Audit"])
 
-    # Generate document vectors from extracted data
-    doc_texts = [r.extracted_json for r in records]
-    doc_vecs = embedding_model.encode(doc_texts)
-
-    # Compute similarity
-    similarities = cosine_similarity(query_vec, doc_vecs)[0]
+with tab1:
+    st.subheader("Process Chat Transcript")
+    transcript_input = st.text_area("Paste Developer Chat / Slack Logs Here:", height=200)
     
-    # Sort top matching records
-    top_indices = np.argsort(similarities)[::-1][:3]
+    if st.button("Extract & Index Decision", type="primary"):
+        if transcript_input.strip():
+            with st.spinner("Analyzing with Gemini..."):
+                try:
+                    data = extract_decision_logic(transcript_input)
+                    save_decision(
+                        transcript_input,
+                        data.get("decision", ""),
+                        data.get("rationale", ""),
+                        data.get("risks", "")
+                    )
+                    st.success("Decision extracted and persisted permanently to Supabase Cloud!")
+                    st.json(data)
+                except Exception as e:
+                    st.error(f"Extraction Error: {e}")
+        else:
+            st.warning("Please enter a transcript first.")
+
+with tab2:
+    st.subheader("Semantic Vector RAG Search")
+    query = st.text_input("Search historical decisions using natural language:")
     
-    matched_records = []
-    retrieved_context = ""
-    for idx in top_indices:
-        rec = records[idx]
-        score = float(similarities[idx])
-        if score > 0.1:  # Relevance threshold
-            matched_records.append({
-                "record_id": rec.id,
-                "channel_name": rec.channel_name,
-                "relevance_score": round(score, 3),
-                "extracted_data": json.loads(rec.extracted_json)
-            })
-            retrieved_context += f"\n- Channel #{rec.channel_name}: {rec.extracted_json}"
+    if query:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, decision, rationale, risks, vector FROM decisions")
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        if rows:
+            query_vec = embedder.encode(query)
+            results = []
+            
+            for r_id, dec, rat, rsk, blob in rows:
+                if blob:
+                    doc_vec = np.frombuffer(bytes(blob), dtype=np.float32)
+                    sim = cosine_similarity([query_vec], [doc_vec])[0][0]
+                    results.append((sim, dec, rat, rsk))
+            
+            results.sort(key=lambda x: x[0], reverse=True)
+            
+            for sim, dec, rat, rsk in results[:5]:
+                with st.expander(f"🎯 Match Confidence: {sim*100:.1f}% - {dec[:60]}..."):
+                    st.write(f"**Decision:** {dec}")
+                    st.write(f"**Rationale:** {rat}")
+                    st.write(f"**Identified Risks:** {rsk}")
+        else:
+            st.info("No indexed decisions found in database.")
 
-    # Generate AI Answer using RAG context
-    rag_prompt = f"""
-    You are an AI Organizational Memory Assistant.
-    Answer the user's question accurately using ONLY the retrieved organizational decisions context below.
+with tab3:
+    st.subheader("Indexed Organizational Memory & Custom Audit Reports")
+    records = get_all_records()
+    
+    if records:
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            filter_mode = st.radio("Filter By:", ["All Time", "By Month", "By Year", "By Specific Date"])
+        
+        display_records = []
+        report_title = "MindGraph AI - Decision Audit Report"
+        file_suffix = "Full_Report"
+        
+        with col2:
+            if filter_mode == "All Time":
+                display_records = records
+                report_title = "MindGraph AI - All Time Decision Audit Report"
+                file_suffix = "All_Time"
+                
+            elif filter_mode == "By Month":
+                months_dict = {}
+                for r in records:
+                    created_at = r[5]
+                    if created_at:
+                        m_key = created_at.strftime("%B %Y") if isinstance(created_at, datetime) else "Other"
+                        months_dict.setdefault(m_key, []).append(r)
+                
+                sel_m = st.selectbox("Select Month:", options=list(months_dict.keys()))
+                display_records = months_dict.get(sel_m, [])
+                report_title = f"MindGraph AI - {sel_m} Monthly Audit Report"
+                file_suffix = sel_m.replace(" ", "_") if sel_m else "Month"
+                
+            elif filter_mode == "By Year":
+                years_dict = {}
+                for r in records:
+                    created_at = r[5]
+                    if created_at:
+                        y_key = created_at.strftime("%Y") if isinstance(created_at, datetime) else "Other"
+                        years_dict.setdefault(y_key, []).append(r)
+                
+                sel_y = st.selectbox("Select Year:", options=list(years_dict.keys()))
+                display_records = years_dict.get(sel_y, [])
+                report_title = f"MindGraph AI - {sel_y} Annual Audit Report"
+                file_suffix = f"Year_{sel_y}" if sel_y else "Year"
+                
+            elif filter_mode == "By Specific Date":
+                sel_date = st.date_input("Select Date:", value=datetime.now())
+                target_date_str = sel_date.strftime("%Y-%m-%d")
+                
+                for r in records:
+                    created_at = r[5]
+                    if created_at and str(created_at).startswith(target_date_str):
+                        display_records.append(r)
+                        
+                report_title = f"MindGraph AI - {target_date_str} Daily Audit Report"
+                file_suffix = f"Date_{target_date_str}"
 
-    User Question: {search_data.query}
-
-    Retrieved Context from Database:
-    {retrieved_context if retrieved_context else "No relevant context found."}
-
-    Be concise, direct, and highlight decisions, rationale, or risks clearly.
-    """
-
-    ai_answer = client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=rag_prompt
-    ).text
-
-    return {
-        "query": search_data.query,
-        "ai_answer": ai_answer,
-        "matched_records": matched_records
-    }
+        st.divider()
+        
+        if display_records:
+            pdf_data = generate_pdf_report(display_records, report_title=report_title)
+            st.download_button(
+                label=f"📥 Download {report_title} (PDF)",
+                data=pdf_data,
+                file_name=f"MindGraph_Audit_{file_suffix}.pdf",
+                mime="application/pdf",
+                type="primary"
+            )
+            st.write(f"Showing **{len(display_records)}** record(s) for selected filter.")
+            st.divider()
+            
+            for r_id, trans, dec, rat, rsk, created_at in display_records:
+                date_str = f" | Date: {created_at}" if created_at else ""
+                with st.expander(f"Record #{r_id}{date_str}: {dec[:80]}"):
+                    st.write(f"**Decision:** {dec}")
+                    st.write(f"**Rationale:** {rat}")
+                    st.write(f"**Risks:** {rsk}")
+                    st.text_area("Original Log", trans, height=100, disabled=True, key=f"raw_{r_id}")
+                    
+                    ind_pdf = generate_pdf_report([(r_id, trans, dec, rat, rsk, created_at)], report_title=f"Decision #{r_id} Summary")
+                    st.download_button(
+                        label=f"📄 Download Decision #{r_id} (PDF)",
+                        data=ind_pdf,
+                        file_name=f"MindGraph_Decision_{r_id}.pdf",
+                        mime="application/pdf",
+                        key=f"pdf_btn_{r_id}"
+                    )
+        else:
+            st.warning("No decisions found for the selected date/filter criteria.")
+    else:
+        st.info("Knowledge base is currently empty.")
