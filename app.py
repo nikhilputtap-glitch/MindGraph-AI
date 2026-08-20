@@ -1,10 +1,15 @@
 import os
 import sqlite3
 import json
+import io
 import streamlit as st
 from google import genai
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
 
 # Page Configuration
 st.set_page_config(page_title="MindGraph AI", page_icon="🧠", layout="wide")
@@ -44,6 +49,98 @@ def init_db():
     conn.close()
 
 init_db()
+
+# PDF Generation Function
+def generate_pdf_report(records):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=36,
+        leftMargin=36,
+        topMargin=36,
+        bottomMargin=36
+    )
+    
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'DocTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=22,
+        leading=26,
+        textColor=colors.HexColor('#1E293B')
+    )
+    subtitle_style = ParagraphStyle(
+        'DocSubTitle',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        leading=14,
+        textColor=colors.HexColor('#64748B')
+    )
+    heading2_style = ParagraphStyle(
+        'Heading2',
+        parent=styles['Heading2'],
+        fontName='Helvetica-Bold',
+        fontSize=13,
+        leading=16,
+        textColor=colors.HexColor('#0F172A')
+    )
+    body_style = ParagraphStyle(
+        'Body',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        leading=14,
+        textColor=colors.HexColor('#334155')
+    )
+    bold_label = ParagraphStyle(
+        'BoldLabel',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=10,
+        leading=14,
+        textColor=colors.HexColor('#1E293B')
+    )
+    
+    story = []
+    
+    # Title Header
+    story.append(Paragraph("🧠 MindGraph AI - Decision Architecture Audit Log", title_style))
+    story.append(Spacer(1, 4))
+    story.append(Paragraph("Enterprise Tacit Knowledge Base Report & Historical Records", subtitle_style))
+    story.append(Spacer(1, 10))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#2563EB'), spaceAfter=15))
+    
+    for rec in records:
+        r_id, trans, dec, rat, rsk = rec
+        story.append(Paragraph(f"Record #{r_id}: {dec[:70]}...", heading2_style))
+        story.append(Spacer(1, 6))
+        
+        table_data = [
+            [Paragraph("Decision:", bold_label), Paragraph(dec, body_style)],
+            [Paragraph("Rationale:", bold_label), Paragraph(rat, body_style)],
+            [Paragraph("Identified Risks:", bold_label), Paragraph(rsk, body_style)],
+        ]
+        
+        t = Table(table_data, colWidths=[100, 440])
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#334155')),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        
+        story.append(t)
+        story.append(Spacer(1, 12))
+    
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
 
 # Core Logic: Gemini Extraction
 def extract_decision_logic(transcript: str):
@@ -107,6 +204,16 @@ with tab1:
                     )
                     st.success("Decision extracted and vector indexed successfully!")
                     st.json(data)
+                    
+                    # Single PDF Export Button
+                    single_rec = [(1, transcript_input, data.get("decision", ""), data.get("rationale", ""), data.get("risks", ""))]
+                    pdf_bytes = generate_pdf_report(single_rec)
+                    st.download_button(
+                        label="📄 Download Decision Summary (PDF)",
+                        data=pdf_bytes,
+                        file_name="MindGraph_Decision_Summary.pdf",
+                        mime="application/pdf"
+                    )
                 except Exception as e:
                     st.error(f"Extraction Error: {e}")
         else:
@@ -149,6 +256,15 @@ with tab3:
     records = get_all_records()
     
     if records:
+        pdf_data = generate_pdf_report(records)
+        st.download_button(
+            label="📥 Download Complete Audit Report (PDF)",
+            data=pdf_data,
+            file_name="MindGraph_Full_Audit_Report.pdf",
+            mime="application/pdf",
+            type="primary"
+        )
+        st.divider()
         for r_id, trans, dec, rat, rsk in records:
             with st.expander(f"Record #{r_id}: {dec[:80]}"):
                 st.write(f"**Decision:** {dec}")
