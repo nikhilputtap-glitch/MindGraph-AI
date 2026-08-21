@@ -1,8 +1,5 @@
 fastapi
 uvicorn
-streamlit
 google-genai
 supabase
 psycopg2-binary
-sentence-transformers
-torch
