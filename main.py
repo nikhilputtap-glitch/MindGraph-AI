@@ -132,13 +132,13 @@ def load_embedder():
 
 embedder = load_embedder()
 
-# Database Connection Fix (Using Direct Supabase Host and Clean Postgres User)
+# Database Connection Fix (Using Supabase IPv4 Pooler Session Mode Port 5432)
 def get_db_connection():
     try:
         conn = pg8000.native.Connection(
-            user="postgres",  # Clean username fixes tenant issue
+            user="postgres.oxwiqxlwzctvblmvmtko",  # Pooler Username
             password="248b1A0452ps",
-            host="db.oxwiqxlwzctvblmvmtko.supabase.co", # Direct Connection Host
+            host="aws-0-ap-south-1.pooler.supabase.com", # IPv4 Supported Pooler Host
             port=5432,
             database="postgres",
             ssl_context=True
