@@ -1,5 +1,8 @@
-fastapi
-uvicorn
-python-multipart
-supabase
+streamlit
 google-genai
+supabase
+sentence-transformers
+scikit-learn
+numpy
+reportlab
+pg8000

@@ -2,7 +2,7 @@ import os
 import json
 import io
 from datetime import datetime
-import psycopg2
+import pg8000.native
 import streamlit as st
 from google import genai
 from sentence_transformers import SentenceTransformer
@@ -42,28 +42,41 @@ def load_embedder():
 
 embedder = load_embedder()
 
-# Database Setup
+# Database Setup (pg8000 pure-python driver for Streamlit Cloud)
 def get_db_connection():
-    return psycopg2.connect(db_url)
+    try:
+        conn = pg8000.native.Connection(
+            user="postgres.oxwiqxlwzctvblmvmtko",
+            password="248b1A0452ps",
+            host="aws-0-ap-south-1.pooler.supabase.com",
+            port=5432,
+            database="postgres",
+            ssl_context=True
+        )
+        return conn
+    except Exception as e:
+        st.error(f"Database Connection Error: {e}")
+        return None
 
 def init_db():
     conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS decisions (
-            id SERIAL PRIMARY KEY,
-            user_email TEXT,
-            transcript TEXT,
-            decision TEXT,
-            rationale TEXT,
-            risks TEXT,
-            vector BYTEA,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.commit()
-    cursor.close()
-    conn.close()
+    if conn:
+        try:
+            conn.run('''
+                CREATE TABLE IF NOT EXISTS decisions (
+                    id SERIAL PRIMARY KEY,
+                    user_email TEXT,
+                    transcript TEXT,
+                    decision TEXT,
+                    rationale TEXT,
+                    risks TEXT,
+                    vector BYTEA,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            ''')
+            conn.close()
+        except Exception as e:
+            st.error(f"Failed to initialize database: {e}")
 
 init_db()
 
@@ -87,7 +100,14 @@ def generate_pdf_report(records, report_title="MindGraph AI - Decision Audit Log
     ]
     
     for rec in records:
-        r_id, u_email, trans, dec, rat, rsk, created_at = rec
+        r_id = rec[0]
+        u_email = rec[1]
+        trans = rec[2]
+        dec = rec[3]
+        rat = rec[4]
+        rsk = rec[5]
+        created_at = rec[6]
+
         story.append(Paragraph(f"Record #{r_id} | Created by: {u_email} | Date: {created_at}", heading2_style))
         story.append(Spacer(1, 4))
         
@@ -138,23 +158,20 @@ def save_decision(user_email, transcript, decision, rationale, risks):
 
     vec_bytes = embedder.encode(str(decision)).tobytes()
     conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO decisions (user_email, transcript, decision, rationale, risks, vector) VALUES (%s, %s, %s, %s, %s, %s)",
-        (user_email, str(transcript), str(decision), str(rationale), str(risks), psycopg2.Binary(vec_bytes))
-    )
-    conn.commit()
-    cursor.close()
-    conn.close()
+    if conn:
+        conn.run(
+            "INSERT INTO decisions (user_email, transcript, decision, rationale, risks, vector) VALUES (:u, :t, :d, :r, :rk, :v)",
+            u=user_email, t=str(transcript), d=str(decision), r=str(rationale), rk=str(risks), v=vec_bytes
+        )
+        conn.close()
 
 def get_all_records():
     conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, user_email, transcript, decision, rationale, risks, created_at FROM decisions ORDER BY id DESC")
-    records = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return records
+    if conn:
+        records = conn.run("SELECT id, user_email, transcript, decision, rationale, risks, created_at FROM decisions ORDER BY id DESC")
+        conn.close()
+        return records
+    return []
 
 # AUTHENTICATION UI
 if st.session_state.user is None:
@@ -231,29 +248,27 @@ else:
         
         if query:
             conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, decision, rationale, risks, vector FROM decisions")
-            rows = cursor.fetchall()
-            cursor.close()
-            conn.close()
-            
-            if rows:
-                query_vec = embedder.encode(query)
-                results = []
-                for r_id, dec, rat, rsk, blob in rows:
-                    if blob:
-                        doc_vec = np.frombuffer(bytes(blob), dtype=np.float32)
-                        sim = cosine_similarity([query_vec], [doc_vec])[0][0]
-                        results.append((sim, dec, rat, rsk))
+            if conn:
+                rows = conn.run("SELECT id, decision, rationale, risks, vector FROM decisions")
+                conn.close()
                 
-                results.sort(key=lambda x: x[0], reverse=True)
-                for sim, dec, rat, rsk in results[:5]:
-                    with st.expander(f"🎯 Match Confidence: {sim*100:.1f}% - {str(dec)[:60]}..."):
-                        st.write(f"**Decision:** {dec}")
-                        st.write(f"**Rationale:** {rat}")
-                        st.write(f"**Identified Risks:** {rsk}")
-            else:
-                st.info("No decisions found.")
+                if rows:
+                    query_vec = embedder.encode(query)
+                    results = []
+                    for r_id, dec, rat, rsk, blob in rows:
+                        if blob:
+                            doc_vec = np.frombuffer(bytes(blob), dtype=np.float32)
+                            sim = cosine_similarity([query_vec], [doc_vec])[0][0]
+                            results.append((sim, dec, rat, rsk))
+                    
+                    results.sort(key=lambda x: x[0], reverse=True)
+                    for sim, dec, rat, rsk in results[:5]:
+                        with st.expander(f"🎯 Match Confidence: {sim*100:.1f}% - {str(dec)[:60]}..."):
+                            st.write(f"**Decision:** {dec}")
+                            st.write(f"**Rationale:** {rat}")
+                            st.write(f"**Identified Risks:** {rsk}")
+                else:
+                    st.info("No decisions found.")
 
     with tab3:
         st.subheader("Indexed Organizational Memory & Audit Reports")
@@ -269,7 +284,14 @@ else:
                 type="primary"
             )
             st.divider()
-            for r_id, u_email, trans, dec, rat, rsk, created_at in records:
+            for rec in records:
+                r_id = rec[0]
+                u_email = rec[1]
+                trans = rec[2]
+                dec = rec[3]
+                rat = rec[4]
+                rsk = rec[5]
+                created_at = rec[6]
                 with st.expander(f"Record #{r_id} | Author: {u_email} | {str(dec)[:60]}"):
                     st.write(f"**Author:** {u_email}")
                     st.write(f"**Decision:** {dec}")
