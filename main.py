@@ -2,6 +2,7 @@ import os
 import json
 import io
 from datetime import datetime
+from urllib.parse import urlparse
 import pg8000.native
 import streamlit as st
 from google import genai
@@ -42,11 +43,20 @@ def load_embedder():
 
 embedder = load_embedder()
 
-# Database Connection via URL parsing
+# Database Connection via urlparse
 def get_db_connection():
     try:
         pooler_url = "postgresql://postgres.oxwiqxlwzctvblmvmtko:248b1A0452ps@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?sslmode=require"
-        conn = pg8000.native.Connection.from_url(pooler_url)
+        url = urlparse(pooler_url)
+        
+        conn = pg8000.native.Connection(
+            user=url.username,
+            password=url.password,
+            host=url.hostname,
+            port=url.port,
+            database=url.path.lstrip('/'),
+            ssl_context=True
+        )
         return conn
     except Exception as e:
         st.error(f"Database Connection Error: {e}")
