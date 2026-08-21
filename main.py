@@ -42,14 +42,14 @@ def load_embedder():
 
 embedder = load_embedder()
 
-# Database Connection Fix (Direct Supabase Host & Standard 'postgres' user)
+# Database Connection Fix (Supabase Pooler IPv4 & Port 6543)
 def get_db_connection():
     try:
         conn = pg8000.native.Connection(
-            user="postgres",
+            user="postgres.oxwiqxlwzctvblmvmtko",
             password="248b1A0452ps",
-            host="db.oxwiqxlwzctvblmvmtko.supabase.co",
-            port=5432,
+            host="aws-0-ap-south-1.pooler.supabase.com",
+            port=6543,
             database="postgres",
             ssl_context=True
         )
@@ -173,16 +173,16 @@ def get_all_records():
         return records
     return []
 
-# AUTHENTICATION UI
+# AUTHENTICATION UI (Only Sign In)
 if st.session_state.user is None:
     st.title("🧠 MindGraph AI - Authentication Portal")
-    auth_tab1, auth_tab2 = st.tabs(["🔒 Sign In", "📝 Sign Up"])
     
-    with auth_tab1:
-        st.subheader("Login to your Workspace")
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.subheader("🔒 Sign In to your Workspace")
         login_email = st.text_input("Email", key="l_email")
         login_password = st.text_input("Password", type="password", key="l_pass")
-        if st.button("Sign In", type="primary"):
+        if st.button("Sign In", type="primary", use_container_width=True):
             try:
                 res = supabase.auth.sign_in_with_password({"email": login_email, "password": login_password})
                 st.session_state.user = res.user
@@ -190,17 +190,6 @@ if st.session_state.user is None:
                 st.rerun()
             except Exception as e:
                 st.error(f"Login Failed: {e}")
-                
-    with auth_tab2:
-        st.subheader("Create a New Account")
-        signup_email = st.text_input("Email", key="s_email")
-        signup_password = st.text_input("Password", type="password", key="s_pass")
-        if st.button("Sign Up"):
-            try:
-                res = supabase.auth.sign_up({"email": signup_email, "password": signup_password})
-                st.success("Account created successfully! You can now Sign In.")
-            except Exception as e:
-                st.error(f"Sign Up Failed: {e}")
 
 # LOGGED-IN DASHBOARD UI
 else:
