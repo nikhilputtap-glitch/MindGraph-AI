@@ -132,14 +132,14 @@ def load_embedder():
 
 embedder = load_embedder()
 
-# Database Connection Fix (Supabase Pooler IPv4 on Session Mode Port 5432)
+# Database Connection Fix (Using Direct Supabase Host and Clean Postgres User)
 def get_db_connection():
     try:
         conn = pg8000.native.Connection(
-            user="postgres.oxwiqxlwzctvblmvmtko",
+            user="postgres",  # Clean username fixes tenant issue
             password="248b1A0452ps",
-            host="aws-0-ap-south-1.pooler.supabase.com",
-            port=5432,  # Port 5432 Session Mode fixes the ENOTFOUND tenant error
+            host="db.oxwiqxlwzctvblmvmtko.supabase.co", # Direct Connection Host
+            port=5432,
             database="postgres",
             ssl_context=True
         )
