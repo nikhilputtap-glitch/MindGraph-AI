@@ -24,12 +24,14 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Plus+Jakarta+Sans:wght@300;400;600&display=swap');
 
+    /* Radial Dark Gradient Background */
     html, body, .stApp {
         background: radial-gradient(circle at 50% 30%, #0f172a 0%, #030712 100%) !important;
         font-family: 'Plus Jakarta Sans', sans-serif !important;
         color: #f8fafc !important;
     }
 
+    /* Hide Top Nav & Footers */
     header[data-testid="stHeader"], footer {
         visibility: hidden !important;
         display: none !important;
@@ -40,6 +42,7 @@ st.markdown("""
         max-width: 1100px !important;
     }
 
+    /* Target Login Input Boxes / Forms */
     div[data-baseweb="input"], div[data-baseweb="input"] input {
         background-color: rgba(30, 41, 59, 0.85) !important;
         color: #f8fafc !important;
@@ -55,6 +58,7 @@ st.markdown("""
         box-shadow: 0 0 18px rgba(59, 130, 246, 0.6) !important;
     }
 
+    /* Streamlit Primary Buttons Custom Glowing Overlay */
     button[kind="primary"], div.stButton > button {
         background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%) !important;
         color: #ffffff !important;
@@ -74,6 +78,7 @@ st.markdown("""
         transform: translateY(-2px) !important;
     }
 
+    /* Custom Glass Card Styling for Expander Containers */
     div[data-testid="stExpander"] {
         background: rgba(15, 23, 42, 0.75) !important;
         border: 1px solid rgba(59, 130, 246, 0.3) !important;
@@ -81,6 +86,7 @@ st.markdown("""
         backdrop-filter: blur(12px) !important;
     }
 
+    /* Tab Header Styling */
     div[data-baseweb="tab-list"] {
         background: rgba(15, 23, 42, 0.8);
         border-radius: 12px;
@@ -126,13 +132,13 @@ def load_embedder():
 
 embedder = load_embedder()
 
-# Database Connection
+# Database Connection Fix (Using Supabase IPv4 Pooler Session Mode Port 5432)
 def get_db_connection():
     try:
         conn = pg8000.native.Connection(
-            user="postgres.oxwiqxlwzctvblmvmtko",
+            user="postgres.oxwiqxlwzctvblmvmtko",  # Pooler Username
             password="248b1A0452ps",
-            host="aws-0-ap-south-1.pooler.supabase.com",
+            host="aws-0-ap-south-1.pooler.supabase.com", # IPv4 Supported Pooler Host
             port=5432,
             database="postgres",
             ssl_context=True
@@ -142,7 +148,6 @@ def get_db_connection():
         st.error(f"Database Connection Error: {e}")
         return None
 
-# Exactly Matching Your Supabase SQL Table Schema
 def init_db():
     conn = get_db_connection()
     if conn:
@@ -191,7 +196,7 @@ def generate_pdf_report(records, report_title="MindGraph AI - Decision Audit Log
         dec = rec[3]
         rat = rec[4]
         rsk = rec[5]
-        created_at = rec[7] if len(rec) > 7 else rec[6]
+        created_at = rec[6]
 
         story.append(Paragraph(f"Record #{r_id} | Created by: {u_email} | Date: {created_at}", heading2_style))
         story.append(Spacer(1, 4))
@@ -241,7 +246,6 @@ def save_decision(user_email, transcript, decision, rationale, risks):
     if isinstance(rationale, (list, dict)):
         rationale = ", ".join(rationale) if isinstance(rationale, list) else str(rationale)
 
-    # Convert embedding vector to HEX string since column type is TEXT in Supabase
     vec_bytes = embedder.encode(str(decision)).tobytes()
     vec_str = vec_bytes.hex()
 
@@ -256,12 +260,12 @@ def save_decision(user_email, transcript, decision, rationale, risks):
 def get_all_records():
     conn = get_db_connection()
     if conn:
-        records = conn.run("SELECT id, user_email, transcript, decision, rationale, risks, vector, created_at FROM decisions ORDER BY id DESC")
+        records = conn.run("SELECT id, user_email, transcript, decision, rationale, risks, created_at FROM decisions ORDER BY id DESC")
         conn.close()
         return records
     return []
 
-# AUTHENTICATION UI
+# AUTHENTICATION UI (Only Sign In)
 if st.session_state.user is None:
     st.markdown("""
         <div style="text-align: center; margin-top: 40px; margin-bottom: 20px;">
@@ -292,6 +296,7 @@ if st.session_state.user is None:
 
 # LOGGED-IN DASHBOARD UI
 else:
+    # Sidebar User Profile
     st.sidebar.markdown('<h2 style="font-family: Orbitron; font-size: 20px; color: #60a5fa;">👤 User Profile</h2>', unsafe_allow_html=True)
     st.sidebar.write("Logged in as:")
     st.sidebar.info(st.session_state.user.email)
@@ -382,6 +387,7 @@ else:
                 dec = rec[3]
                 rat = rec[4]
                 rsk = rec[5]
+                created_at = rec[6]
                 with st.expander(f"Record #{r_id} | Author: {u_email} | {str(dec)[:60]}"):
                     st.write(f"**Author:** {u_email}")
                     st.write(f"**Decision:** {dec}")
