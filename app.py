@@ -12,93 +12,90 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for Cinematic Dark Theme & Cyberpunk Glows
+# Custom CSS targeting Streamlit Cloud DOM structure strictly
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Plus+Jakarta+Sans:wght@300;400;600&display=swap');
 
-    /* Overall App Background */
-    .stApp {
+    /* 1. Global App Background Dynamic Gradient */
+    .stAppViewContainer, .stApp, [data-testid="stAppViewContainer"] {
         background: radial-gradient(circle at 15% 15%, #0f172a 0%, #030712 100%) !important;
         font-family: 'Plus Jakarta Sans', sans-serif !important;
         color: #f8fafc !important;
     }
 
-    /* Hide Streamlit Header & Footer Header */
+    /* 2. Hide Streamlit Header & Footer */
     header[data-testid="stHeader"] {visibility: hidden;}
     footer {visibility: hidden;}
 
-    /* Sidebar Styling */
+    /* 3. Sidebar Styling */
     section[data-testid="stSidebar"] {
-        background-color: rgba(15, 23, 42, 0.8) !important;
+        background-color: rgba(15, 23, 42, 0.85) !important;
         border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
         backdrop-filter: blur(15px);
     }
 
-    /* Glassmorphic Cards Container */
-    div.stCard {
-        background: rgba(30, 41, 59, 0.5) !important;
-        border: 1px solid rgba(59, 130, 246, 0.2) !important;
-        border-radius: 16px !important;
-        padding: 24px !important;
-        backdrop-filter: blur(10px) !important;
-        box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
-        margin-bottom: 20px;
-    }
-
-    /* Custom Gradient Headings */
-    .brand-title {
-        font-family: 'Orbitron', sans-serif;
-        font-weight: 800;
-        font-size: 32px;
-        background: linear-gradient(135deg, #3b82f6 0%, #a855f7 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        letter-spacing: 2px;
-        margin-bottom: 0px;
+    /* 4. Title & Headers Typography Override */
+    h1, .stMarkdown h1, .brand-title {
+        font-family: 'Orbitron', sans-serif !important;
+        font-weight: 800 !important;
+        background: linear-gradient(135deg, #3b82f6 0%, #a855f7 100%) !important;
+        -webkit-background-clip: text !important;
+        -webkit-text-fill-color: transparent !important;
+        letter-spacing: 2px !important;
     }
 
     .brand-subtitle {
-        color: #94a3b8;
-        font-size: 14px;
-        letter-spacing: 1px;
-        margin-bottom: 25px;
+        color: #94a3b8 !important;
+        font-size: 13px !important;
+        letter-spacing: 1px !important;
+        margin-bottom: 20px !important;
     }
 
-    /* Input & Textarea Fields Styling */
-    .stTextInput input, .stTextArea textarea {
-        background: rgba(15, 23, 42, 0.7) !important;
-        border: 1px solid rgba(148, 163, 184, 0.2) !important;
+    /* 5. Input Fields & Textareas Glow Styling */
+    div[data-baseweb="input"], div[data-baseweb="textarea"] {
+        background-color: rgba(15, 23, 42, 0.8) !important;
+        border: 1px solid rgba(59, 130, 246, 0.4) !important;
         border-radius: 10px !important;
-        color: #f8fafc !important;
-        font-size: 14px !important;
     }
-    .stTextInput input:focus, .stTextArea textarea:focus {
-        border-color: #3b82f6 !important;
-        box-shadow: 0 0 12px rgba(59, 130, 246, 0.4) !important;
+    div[data-baseweb="input"]:focus-within, div[data-baseweb="textarea"]:focus-within {
+        border-color: #a855f7 !important;
+        box-shadow: 0 0 15px rgba(168, 85, 247, 0.5) !important;
+    }
+    input, textarea {
+        color: #f8fafc !important;
     }
 
-    /* Neon Gradient Buttons */
-    .stButton > button {
+    /* 6. Override Red Button to Neon Blue/Purple Gradient */
+    div.stButton > button, div.stFormSubmitButton > button, button[kind="primary"] {
         background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%) !important;
         color: #ffffff !important;
         font-family: 'Orbitron', sans-serif !important;
-        font-weight: 600 !important;
-        font-size: 13px !important;
+        font-weight: 700 !important;
         letter-spacing: 1.5px !important;
         border: none !important;
         border-radius: 10px !important;
         padding: 12px 24px !important;
+        box-shadow: 0 4px 20px rgba(37, 99, 235, 0.5) !important;
         transition: all 0.3s ease-in-out !important;
-        box-shadow: 0 4px 20px rgba(37, 99, 235, 0.4) !important;
-        width: 100%;
+        width: 100% !important;
     }
-    .stButton > button:hover {
+    div.stButton > button:hover, div.stFormSubmitButton > button:hover {
         transform: translateY(-2px) !important;
-        box-shadow: 0 8px 25px rgba(124, 58, 237, 0.6) !important;
+        box-shadow: 0 8px 25px rgba(124, 58, 237, 0.8) !important;
     }
 
-    /* Badge & Tag Styles */
+    /* 7. Glassmorphic Card Containers */
+    div[data-testid="stVerticalBlock"] > div:has(div.stCard) {
+        background: rgba(30, 41, 59, 0.4) !important;
+        border: 1px solid rgba(59, 130, 246, 0.2) !important;
+        border-radius: 16px !important;
+        padding: 20px !important;
+        backdrop-filter: blur(10px) !important;
+        box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Badge Tag Styles */
     .badge-tag {
         background: rgba(37, 99, 235, 0.2);
         color: #60a5fa;
@@ -118,7 +115,6 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 if "db" not in st.session_state:
-    # Dummy initial knowledge base
     st.session_state.db = [
         {
             "id": "KB-101",
@@ -146,21 +142,22 @@ if not st.session_state.authenticated:
         st.markdown("<br><br>", unsafe_allow_html=True)
         st.markdown("""
             <div style="text-align: center;">
-                <div class="brand-title">MINDGRAPH AI</div>
+                <h1 style="font-size: 32px; margin-bottom: 5px;">MINDGRAPH AI</h1>
                 <div class="brand-subtitle">ENTERPRISE TACIT KNOWLEDGE INTELLIGENCE</div>
             </div>
         """, unsafe_allow_html=True)
 
-        with st.container():
-            st.markdown('<div class="stCard">', unsafe_allow_html=True)
-            st.subheader("INITIALIZE SESSION")
+        with st.form("login_form"):
+            st.subheader("SIGN IN TO WORKSPACE")
             
             username = st.text_input("Enterprise Identity", placeholder="developer@company.com")
             password = st.text_input("Access Key / Token", type="password", placeholder="••••••••••••")
             
-            if st.button("AUTHENTICATE"):
+            submit = st.form_submit_button("AUTHENTICATE SESSION")
+            
+            if submit:
                 if username and password:
-                    with st.spinner("Verifying Credentials & API Security Policy..."):
+                    with st.spinner("Verifying Credentials & Encrypted API Policy..."):
                         time.sleep(1)
                         st.session_state.authenticated = True
                         st.rerun()
@@ -172,7 +169,6 @@ if not st.session_state.authenticated:
                     Protected by Supabase Auth Policy & Encrypted REST Layer
                 </div>
             """, unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
 # 4. MAIN DASHBOARD VIEW
@@ -180,8 +176,8 @@ if not st.session_state.authenticated:
 else:
     # Sidebar Controls
     with st.sidebar:
-        st.markdown('<div class="brand-title" style="font-size: 22px;">MINDGRAPH AI</div>', unsafe_allow_html=True)
-        st.markdown('<div class="brand-subtitle" style="font-size: 11px;">Tacit Knowledge Platform</div>', unsafe_allow_html=True)
+        st.markdown('<h1>MINDGRAPH AI</h1>', unsafe_allow_html=True)
+        st.markdown('<div class="brand-subtitle">Tacit Knowledge Platform</div>', unsafe_allow_html=True)
         st.divider()
         
         st.markdown("### **Navigation**")
@@ -197,13 +193,12 @@ else:
 
     # --- TAB 1: INGEST & EXTRACTION ---
     if page == "1. Chat Ingest & Extraction":
-        st.markdown('<div class="brand-title">Automated Tacit Knowledge Capture</div>', unsafe_allow_html=True)
+        st.markdown('<h1>Automated Tacit Knowledge Capture</h1>', unsafe_allow_html=True)
         st.markdown('<div class="brand-subtitle">Paste raw developer chat conversations to auto-extract Decision, Rationale & Technical Risks.</div>', unsafe_allow_html=True)
         
         col_input, col_output = st.columns([1, 1])
         
         with col_input:
-            st.markdown('<div class="stCard">', unsafe_allow_html=True)
             st.subheader("📥 Raw Chat Ingestion")
             default_chat = """Alex: Hey team, we need to decide on vector DB for MindGraph AI RAG pipeline.
 Priya: Should we host Pinecone or go with pgvector on Supabase?
@@ -216,9 +211,8 @@ Alex: Okay, let's lock pgvector on Supabase. We will monitor RAM usage during re
             if st.button("RUN GEMINI PARSER"):
                 if chat_text:
                     with st.spinner("Gemini 2.5 Flash parsing structured decisions..."):
-                        time.sleep(1.5) # Simulating AI processing delay
+                        time.sleep(1.2)
                         
-                        # Simulated AI Result Output
                         new_record = {
                             "id": f"KB-10{len(st.session_state.db) + 1}",
                             "decision": "Adopted Supabase pgvector for Vector RAG Indexing",
@@ -229,10 +223,8 @@ Alex: Okay, let's lock pgvector on Supabase. We will monitor RAM usage during re
                         
                         st.session_state.extracted_result = new_record
                         st.success("Decision successfully extracted!")
-            st.markdown('</div>', unsafe_allow_html=True)
 
         with col_output:
-            st.markdown('<div class="stCard">', unsafe_allow_html=True)
             st.subheader("⚡ Structured Intelligence Output")
             
             if "extracted_result" in st.session_state:
@@ -249,11 +241,10 @@ Alex: Okay, let's lock pgvector on Supabase. We will monitor RAM usage during re
                     del st.session_state.extracted_result
             else:
                 st.info("Paste a chat transcript on the left and click 'Run Gemini Parser' to view extracted structured decisions.")
-            st.markdown('</div>', unsafe_allow_html=True)
 
     # --- TAB 2: SEMANTIC VECTOR SEARCH ---
     elif page == "2. Semantic Vector RAG Search":
-        st.markdown('<div class="brand-title">Semantic Decision RAG Engine</div>', unsafe_allow_html=True)
+        st.markdown('<h1>Semantic Decision RAG Engine</h1>', unsafe_allow_html=True)
         st.markdown('<div class="brand-subtitle">Search historical decisions by concept or intent rather than exact keyword matching.</div>', unsafe_allow_html=True)
         
         search_query = st.text_input("🔍 Search Query (e.g., 'Why did we choose relational database?' or 'Vector database decision')", "")
@@ -264,16 +255,15 @@ Alex: Okay, let's lock pgvector on Supabase. We will monitor RAM usage during re
                 time.sleep(0.8)
                 
                 for record in st.session_state.db:
-                    st.markdown('<div class="stCard">', unsafe_allow_html=True)
                     st.markdown(f"### 🎯 {record['decision']}")
                     st.markdown(f"**Rationale:** {record['rationale']}")
                     st.markdown(f"**Associated Risks:** {record['risks']}")
                     st.markdown(f"<span class='badge-tag'>Match Score: 94.2%</span> <span class='badge-tag'>Author: {record['author']}</span>", unsafe_allow_html=True)
-                    st.markdown('</div>', unsafe_allow_html=True)
+                    st.divider()
 
     # --- TAB 3: AUDIT LOGS & EXPORT ---
     elif page == "3. Audit Logs & PDF Export":
-        st.markdown('<div class="brand-title">Institutional Memory & Audit Compliance</div>', unsafe_allow_html=True)
+        st.markdown('<h1>Institutional Memory & Audit Compliance</h1>', unsafe_allow_html=True)
         st.markdown('<div class="brand-subtitle">Review knowledge logs and export 1-click compliance PDF reports.</div>', unsafe_allow_html=True)
         
         st.markdown("### **Current Knowledge Base Records**")
