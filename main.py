@@ -42,13 +42,13 @@ def load_embedder():
 
 embedder = load_embedder()
 
-# Database Setup (pg8000 pure-python driver for Streamlit Cloud)
+# Database Connection Fix (Direct Supabase Host & Standard 'postgres' user)
 def get_db_connection():
     try:
         conn = pg8000.native.Connection(
-            user="postgres.oxwiqxlwzctvblmvmtko",
+            user="postgres",
             password="248b1A0452ps",
-            host="aws-0-ap-south-1.pooler.supabase.com",
+            host="db.oxwiqxlwzctvblmvmtko.supabase.co",
             port=5432,
             database="postgres",
             ssl_context=True
