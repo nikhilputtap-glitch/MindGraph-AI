@@ -2,7 +2,6 @@ import os
 import json
 import io
 from datetime import datetime
-from urllib.parse import urlparse
 import pg8000.native
 import streamlit as st
 from google import genai
@@ -43,18 +42,15 @@ def load_embedder():
 
 embedder = load_embedder()
 
-# Database Connection via urlparse
+# Database Connection Fix (Supabase Pooler IPv4 on Session Mode Port 5432)
 def get_db_connection():
     try:
-        pooler_url = "postgresql://postgres.oxwiqxlwzctvblmvmtko:248b1A0452ps@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?sslmode=require"
-        url = urlparse(pooler_url)
-        
         conn = pg8000.native.Connection(
-            user=url.username,
-            password=url.password,
-            host=url.hostname,
-            port=url.port,
-            database=url.path.lstrip('/'),
+            user="postgres.oxwiqxlwzctvblmvmtko",
+            password="248b1A0452ps",
+            host="aws-0-ap-south-1.pooler.supabase.com",
+            port=5432,  # Port 5432 Session Mode fixes the ENOTFOUND tenant error
+            database="postgres",
             ssl_context=True
         )
         return conn
