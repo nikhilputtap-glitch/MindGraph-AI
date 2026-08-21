@@ -8,3 +8,4 @@ streamlit
 reportlab
 requests
 numpy
+psycopg2-binary
