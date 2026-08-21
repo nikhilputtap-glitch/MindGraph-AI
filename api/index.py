@@ -1,17 +1,20 @@
 from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse
 import os
-from supabase import create_client, Client
 
 app = FastAPI()
 
-# Supabase Credentials
+# Supabase Client Setup
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
 
-supabase: Client = None
+supabase = None
 if SUPABASE_URL and SUPABASE_ANON_KEY:
-    supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+    try:
+        from supabase import create_client
+        supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+    except Exception as e:
+        print(f"Supabase init error: {e}")
 
 @app.get("/", response_class=HTMLResponse)
 def home():
@@ -89,7 +92,7 @@ def home():
 @app.post("/login")
 def login(email: str = Form(...), password: str = Form(...)):
     if not supabase:
-        return {"status": "error", "detail": "Supabase Environment Variables are missing!"}
+        return {"status": "error", "detail": "Supabase Connection Failure or Missing Keys"}
     
     try:
         res = supabase.auth.sign_in_with_password({"email": email, "password": password})
