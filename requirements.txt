@@ -1,11 +1,5 @@
 fastapi
 uvicorn
-sqlalchemy
 google-genai
-sentence-transformers
-scikit-learn
-streamlit
-reportlab
-requests
-numpy
+supabase
 psycopg2-binary
