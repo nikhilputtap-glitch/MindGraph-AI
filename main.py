@@ -2,7 +2,6 @@ import os
 import json
 import io
 from datetime import datetime
-import pg8000.native
 import streamlit as st
 from google import genai
 from sentence_transformers import SentenceTransformer
@@ -19,11 +18,10 @@ st.set_page_config(page_title="MindGraph AI - Secure Workspace", page_icon="🧠
 
 # Secrets Retrieval
 api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
-db_url = st.secrets.get("DATABASE_URL") or os.getenv("DATABASE_URL")
 supabase_url = st.secrets.get("SUPABASE_URL") or os.getenv("SUPABASE_URL")
 supabase_anon_key = st.secrets.get("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_ANON_KEY")
 
-if not api_key or not db_url or not supabase_url or not supabase_anon_key:
+if not api_key or not supabase_url or not supabase_anon_key:
     st.error("Missing configuration secrets! Please verify Streamlit Secrets.")
     st.stop()
 
@@ -41,44 +39,6 @@ def load_embedder():
     return SentenceTransformer('all-MiniLM-L6-v2')
 
 embedder = load_embedder()
-
-# Database Connection Fix (Supabase Pooler IPv4 on Session Mode Port 5432)
-def get_db_connection():
-    try:
-        conn = pg8000.native.Connection(
-            user="postgres.oxwiqxlwzctvblmvmtko",
-            password="248b1A0452ps",
-            host="aws-0-ap-south-1.pooler.supabase.com",
-            port=5432,  # Port 5432 Session Mode fixes the ENOTFOUND tenant error
-            database="postgres",
-            ssl_context=True
-        )
-        return conn
-    except Exception as e:
-        st.error(f"Database Connection Error: {e}")
-        return None
-
-def init_db():
-    conn = get_db_connection()
-    if conn:
-        try:
-            conn.run('''
-                CREATE TABLE IF NOT EXISTS decisions (
-                    id SERIAL PRIMARY KEY,
-                    user_email TEXT,
-                    transcript TEXT,
-                    decision TEXT,
-                    rationale TEXT,
-                    risks TEXT,
-                    vector BYTEA,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-            ''')
-            conn.close()
-        except Exception as e:
-            st.error(f"Failed to initialize database: {e}")
-
-init_db()
 
 # PDF Generation
 def generate_pdf_report(records, report_title="MindGraph AI - Decision Audit Log"):
@@ -100,13 +60,13 @@ def generate_pdf_report(records, report_title="MindGraph AI - Decision Audit Log
     ]
     
     for rec in records:
-        r_id = rec[0]
-        u_email = rec[1]
-        trans = rec[2]
-        dec = rec[3]
-        rat = rec[4]
-        rsk = rec[5]
-        created_at = rec[6]
+        r_id = rec.get("id")
+        u_email = rec.get("user_email")
+        trans = rec.get("transcript")
+        dec = rec.get("decision")
+        rat = rec.get("rationale")
+        rsk = rec.get("risks")
+        created_at = rec.get("created_at")
 
         story.append(Paragraph(f"Record #{r_id} | Created by: {u_email} | Date: {created_at}", heading2_style))
         story.append(Spacer(1, 4))
@@ -148,6 +108,7 @@ def extract_decision_logic(transcript: str):
         text = text[7:-3].strip()
     return json.loads(text)
 
+# Save via REST API (No DB connection / Tenant Error)
 def save_decision(user_email, transcript, decision, rationale, risks):
     if isinstance(risks, (list, dict)):
         risks = ", ".join(risks) if isinstance(risks, list) else str(risks)
@@ -156,22 +117,30 @@ def save_decision(user_email, transcript, decision, rationale, risks):
     if isinstance(rationale, (list, dict)):
         rationale = ", ".join(rationale) if isinstance(rationale, list) else str(rationale)
 
-    vec_bytes = embedder.encode(str(decision)).tobytes()
-    conn = get_db_connection()
-    if conn:
-        conn.run(
-            "INSERT INTO decisions (user_email, transcript, decision, rationale, risks, vector) VALUES (:u, :t, :d, :r, :rk, :v)",
-            u=user_email, t=str(transcript), d=str(decision), r=str(rationale), rk=str(risks), v=vec_bytes
-        )
-        conn.close()
+    vec_list = embedder.encode(str(decision)).tolist()
+    
+    data = {
+        "user_email": user_email,
+        "transcript": str(transcript),
+        "decision": str(decision),
+        "rationale": str(rationale),
+        "risks": str(risks),
+        "vector": str(vec_list) # Json formatted vector list for storage
+    }
+    
+    try:
+        supabase.table("decisions").insert(data).execute()
+    except Exception as e:
+        st.error(f"Error saving to database: {e}")
 
+# Fetch via REST API
 def get_all_records():
-    conn = get_db_connection()
-    if conn:
-        records = conn.run("SELECT id, user_email, transcript, decision, rationale, risks, created_at FROM decisions ORDER BY id DESC")
-        conn.close()
-        return records
-    return []
+    try:
+        res = supabase.table("decisions").select("*").order("id", desc=True).execute()
+        return res.data
+    except Exception as e:
+        st.error(f"Error fetching records: {e}")
+        return []
 
 # AUTHENTICATION UI (Only Sign In)
 if st.session_state.user is None:
@@ -236,28 +205,32 @@ else:
         query = st.text_input("Search historical decisions:")
         
         if query:
-            conn = get_db_connection()
-            if conn:
-                rows = conn.run("SELECT id, decision, rationale, risks, vector FROM decisions")
-                conn.close()
-                
-                if rows:
-                    query_vec = embedder.encode(query)
-                    results = []
-                    for r_id, dec, rat, rsk, blob in rows:
-                        if blob:
-                            doc_vec = np.frombuffer(bytes(blob), dtype=np.float32)
+            rows = get_all_records()
+            if rows:
+                query_vec = embedder.encode(query)
+                results = []
+                for r in rows:
+                    vec_raw = r.get("vector")
+                    dec = r.get("decision")
+                    rat = r.get("rationale")
+                    rsk = r.get("risks")
+                    
+                    if vec_raw:
+                        try:
+                            doc_vec = np.array(json.loads(vec_raw), dtype=np.float32)
                             sim = cosine_similarity([query_vec], [doc_vec])[0][0]
                             results.append((sim, dec, rat, rsk))
-                    
-                    results.sort(key=lambda x: x[0], reverse=True)
-                    for sim, dec, rat, rsk in results[:5]:
-                        with st.expander(f"🎯 Match Confidence: {sim*100:.1f}% - {str(dec)[:60]}..."):
-                            st.write(f"**Decision:** {dec}")
-                            st.write(f"**Rationale:** {rat}")
-                            st.write(f"**Identified Risks:** {rsk}")
-                else:
-                    st.info("No decisions found.")
+                        except Exception:
+                            pass
+                
+                results.sort(key=lambda x: x[0], reverse=True)
+                for sim, dec, rat, rsk in results[:5]:
+                    with st.expander(f"🎯 Match Confidence: {sim*100:.1f}% - {str(dec)[:60]}..."):
+                        st.write(f"**Decision:** {dec}")
+                        st.write(f"**Rationale:** {rat}")
+                        st.write(f"**Identified Risks:** {rsk}")
+            else:
+                st.info("No decisions found.")
 
     with tab3:
         st.subheader("Indexed Organizational Memory & Audit Reports")
@@ -274,13 +247,13 @@ else:
             )
             st.divider()
             for rec in records:
-                r_id = rec[0]
-                u_email = rec[1]
-                trans = rec[2]
-                dec = rec[3]
-                rat = rec[4]
-                rsk = rec[5]
-                created_at = rec[6]
+                r_id = rec.get("id")
+                u_email = rec.get("user_email")
+                trans = rec.get("transcript")
+                dec = rec.get("decision")
+                rat = rec.get("rationale")
+                rsk = rec.get("risks")
+                
                 with st.expander(f"Record #{r_id} | Author: {u_email} | {str(dec)[:60]}"):
                     st.write(f"**Author:** {u_email}")
                     st.write(f"**Decision:** {dec}")
