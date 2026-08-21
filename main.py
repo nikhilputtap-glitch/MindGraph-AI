@@ -42,17 +42,11 @@ def load_embedder():
 
 embedder = load_embedder()
 
-# Database Connection Fix (Supabase Pooler IPv4 & Port 6543)
+# Database Connection via URL parsing
 def get_db_connection():
     try:
-        conn = pg8000.native.Connection(
-            user="postgres.oxwiqxlwzctvblmvmtko",
-            password="248b1A0452ps",
-            host="aws-0-ap-south-1.pooler.supabase.com",
-            port=6543,
-            database="postgres",
-            ssl_context=True
-        )
+        pooler_url = "postgresql://postgres.oxwiqxlwzctvblmvmtko:248b1A0452ps@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?sslmode=require"
+        conn = pg8000.native.Connection.from_url(pooler_url)
         return conn
     except Exception as e:
         st.error(f"Database Connection Error: {e}")
