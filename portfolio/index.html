@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nikhil Reddy Putta — Portfolio</title>
+    <meta
+      name="description"
+      content="Cinematic 3D portfolio of Nikhil Reddy Putta — ECE Embedded Systems, AI engineering, and full-stack systems."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Syne:wght@500;700;800&family=IBM+Plex+Sans:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./css/style.css" />
+  </head>
+  <body>
+    <canvas id="world"></canvas>
+    <div class="grain" aria-hidden="true"></div>
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="scan" aria-hidden="true"></div>
+
+    <div id="loader">
+      <div class="loader-inner">
+        <p class="loader-kicker">Initializing signal</p>
+        <h1>NRP</h1>
+        <div class="loader-bar"><span></span></div>
+        <p class="loader-copy">Calibrating orbital systems</p>
+      </div>
+    </div>
+
+    <header class="hud">
+      <a class="mark" href="#hero">NRP</a>
+      <nav>
+        <a href="#about">About</a>
+        <a href="#skills">Skills</a>
+        <a href="#work">Work</a>
+        <a href="#path">Path</a>
+        <a href="#contact">Contact</a>
+      </nav>
+      <a class="resume" href="mailto:nikhilputtap@gmail.com">Available</a>
+    </header>
+
+    <main>
+      <section class="panel" id="hero">
+        <p class="kicker">Electronics &amp; Communication · Embedded Systems</p>
+        <h1>Nikhil Reddy <em>Putta</em></h1>
+        <p class="lede">
+          Engineering at the seam of silicon, software, and intelligence —
+          building systems that see, listen, remember, and act.
+        </p>
+        <div class="cta-row">
+          <a class="btn gold" href="#work">View work</a>
+          <a class="btn ghost" href="https://github.com/nikhilputtap-glitch" target="_blank" rel="noreferrer">GitHub</a>
+        </div>
+        <p class="scroll-hint">Scroll to enter the orbit</p>
+      </section>
+
+      <section class="panel glass" id="about">
+        <p class="kicker">01 — Profile</p>
+        <h2>A builder with dual fluency.</h2>
+        <p>
+          ECE student specializing in Embedded Systems, with strong software
+          craft, hands-on project depth, and fluency in modern AI tools. Quick
+          to learn, precise in communication, and drawn to technologies that
+          have not fully arrived yet.
+        </p>
+        <ul class="facts">
+          <li><span>Focus</span> Embedded · AI systems · Full-stack</li>
+          <li><span>Education</span> B.Tech · 2024 — 2028</li>
+          <li><span>Base</span> Andhra Pradesh, India</li>
+        </ul>
+      </section>
+
+      <section class="panel glass" id="skills">
+        <p class="kicker">02 — Capabilities</p>
+        <h2>The stack behind the signal.</h2>
+        <div class="skill-grid">
+          <article>
+            <h3>Languages</h3>
+            <p>Python · C · HTML · CSS · SQL</p>
+          </article>
+          <article>
+            <h3>Systems</h3>
+            <p>Git · GitHub · Vercel · Microcontrollers · System design</p>
+          </article>
+          <article>
+            <h3>Intelligence</h3>
+            <p>Gemini · OpenCV · Semantic search · Voice &amp; vision pipelines</p>
+          </article>
+          <article>
+            <h3>Presence</h3>
+            <p>Presentation · Communication · Leadership</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" id="work">
+        <p class="kicker">03 — Selected work</p>
+        <h2>Projects built to feel like products.</h2>
+
+        <article class="work-card">
+          <div class="work-meta">J.A.R.V.I.S.</div>
+          <h3>Multimodal AI Assistant</h3>
+          <p>
+            A feature-rich assistant with voice interaction, facial-recognition
+            login, and intelligent task automation. Python core, Google Gemini,
+            OpenCV, and a constellation of APIs — designed so the machine
+            meets you as an interface, not a prompt box.
+          </p>
+          <a href="https://github.com/nikhilputtap-glitch/JARVIS" target="_blank" rel="noreferrer">Open repository →</a>
+        </article>
+
+        <article class="work-card">
+          <div class="work-meta">AI Digital Immortality</div>
+          <h3>Persistent memory. Modeled personality.</h3>
+          <p>
+            A platform for lasting digital presence: memory ingestion,
+            personality modeling, and semantic search. Next.js and Tailwind at
+            the edge, FastAPI and Gemini underneath — a clone that can be
+            spoken with, searched, and understood over a lifetime of data.
+          </p>
+          <a href="https://github.com/nikhilputtap-glitch/ai-immortality" target="_blank" rel="noreferrer">Open repository →</a>
+        </article>
+      </section>
+
+      <section class="panel glass" id="path">
+        <p class="kicker">04 — Trajectory</p>
+        <h2>Formation &amp; proof.</h2>
+        <div class="timeline">
+          <article>
+            <time>July 2024 — July 2028</time>
+            <h3>Bachelor of Technology</h3>
+            <p class="place">Rise Krishna Sai Gandhi Group of Institutions, Andhra Pradesh</p>
+            <p>
+              Foundation in embedded systems, electronics, and software.
+              Practical work with microcontrollers, programming, and system
+              design using contemporary tools.
+            </p>
+          </article>
+          <article>
+            <time>July 2026</time>
+            <h3>AI Foundations — OpenAI Academy</h3>
+            <p>
+              Core AI concepts, capabilities, and practical foundations for
+              building AI-driven solutions.
+            </p>
+          </article>
+          <article>
+            <time>June 2026</time>
+            <h3>Deloitte Technology Job Simulation — Forage</h3>
+            <p>
+              Practical coding and development tasks inside Deloitte’s
+              real-world technology workflows.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel glass" id="contact">
+        <p class="kicker">05 — Transmission</p>
+        <h2>Let’s build the next system.</h2>
+        <p>
+          Open to internships, collaborations, and ambitious AI / embedded
+          product work.
+        </p>
+        <div class="contact-links">
+          <a href="mailto:nikhilputtap@gmail.com">nikhilputtap@gmail.com</a>
+          <a href="tel:+918688923649">+91 86889 23649</a>
+          <a href="https://www.linkedin.com/in/nikhil-reddy-putta-740bb037b" target="_blank" rel="noreferrer">LinkedIn</a>
+          <a href="https://github.com/nikhilputtap-glitch" target="_blank" rel="noreferrer">GitHub</a>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>© 2026 Nikhil Reddy Putta</span>
+      <span>Cinematic systems · ECE · AI</span>
+    </footer>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+        }
+      }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+    <script type="module" src="./js/world.js"></script>
+  </body>
+</html>
